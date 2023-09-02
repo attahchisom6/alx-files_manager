@@ -1,11 +1,11 @@
-import { isAlive as isRedisAlive } from '../utils/redis'
-import { isAlive as isDbAlive, nbUsers, nbFiles } from '../utils/db';
+import redisClient from'../utils/redis';
+import dbClient from '../utils/db.js';
 
 const AppController = {
   async getStatus(req, res) {
     try {
-      const redisStatus = await isRedisAlive();
-      const dbStatus = await isDbAlive();
+      const redisStatus = await redisClient.isAlive();
+      const dbStatus = await dbClient.isAlive();
 
       res.status(200).json({ "redis": redisStatus, "db": dbStatus });
     } catch (error) {
@@ -15,8 +15,8 @@ const AppController = {
 
   async getStats(req, res) {
     try {
-      const numUsers = await nbUsers();
-      const numFiles = await nbFiles();
+      const numUsers = await dbClient.nbUsers();
+      const numFiles = await dbClient.nbFiles();
 
       res.status(200).json({ "users": numUsers, "files": numFiles });
     } catch(error) {
@@ -25,4 +25,4 @@ const AppController = {
   },
 }
 
-module.exports = AppController;
+export default AppController;
