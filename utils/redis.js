@@ -1,5 +1,5 @@
 import redis from 'redis'
-import promisify from 'util':
+import { promisify } from 'util';
 
 class RedisClient {
   constructor() {
@@ -20,8 +20,8 @@ class RedisClient {
 
   async set(key, value, expirationDuration) {
     //setex for setting with expiration duration
-    const asyncSet = promidify(this.client.setex).bind(this.client);
-    await asyncSet(key, value, expirationDuration);
+    const asyncSet = promisify(this.client.setex).bind(this.client);
+    await asyncSet(key, expirationDuration, value);
   }
 
   async get(key) {
@@ -32,12 +32,11 @@ class RedisClient {
 
   async del(key) {
     const asyncDel = promisify(this.client.del).bind(this.client);
-    await asyncDel(key, () => {
-      console.log('Successfully deleted value with key:', key);
-    });
+    await asyncDel(key);
+    console.log('Successfully deleted value with key:', key);
   }
 }
 
-const redisClient = RedisClient;
+const redisClient = new RedisClient();
 
-module.exports = redisClient();
+module.exports = redisClient;
