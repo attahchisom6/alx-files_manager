@@ -15,7 +15,7 @@ class DBClient {
 
     this.client.connect()
     .then(() => console.log('Sucessfully connected to the MongoDb Server'))
-    .catch((error) => console.log('Session Terminated; could not connect to the server: ', error));
+    .catch((error) => console.log('Session Terminated; could not connect to the Mongo server: ', error));
   }
 
   isAlive() {
@@ -32,6 +32,14 @@ class DBClient {
     const fileCollection = this.client.db().collection('files');
     const count = await fileCollection.countDocuments();
     return count;
+  }
+
+  async usersCollection(){
+    return this.client.db().collection('users');
+  }
+
+  async filesCollection() {
+    return this.client.db().collection('files');
   }
 }
 
