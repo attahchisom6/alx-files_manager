@@ -32,7 +32,7 @@ const AuthController = {
       await redisClient.set(key, user._id, 86400);
       res.status(200).json({ "token": token });
     } catch(error) {
-      res.status(401).json({ error: "Unauthorized" });
+      res.status(500).json({ error: "Internal Server Error" });
       return;
     }
   }
