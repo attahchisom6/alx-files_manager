@@ -35,10 +35,9 @@ const AuthController = {
       res.status(500).json({ error: "Internal Server Error" });
       return;
     }
-  }
-}
+  },
 
-  async getDisconnect(res, req) {
+  async getDisconnect(req, res) {
     const { 'X-Token': token } = req.headers;
 
     if (!token) {
