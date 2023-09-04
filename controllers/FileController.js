@@ -21,7 +21,7 @@ const FileController = {
       return;
     }
 
-    const acceptedTypes = [ folder, files, image ];
+    const acceptedTypes = [ 'folder', 'files', 'image' ];
     if (!type || !acceptedTypes.includes(type)) {
       res.status(400).json({ error: "Missing name" });
       return;
@@ -66,12 +66,15 @@ const FileController = {
     }
 
     if (type === 'folder') {
-      dbClient.fileCollection().insertOne(fileData);
-      res.status(201).json(fileData);
+      const fileData.name = name;
+      // something like mkdir fileData should be here, write in js
+      dbClient.fileCollection().insertOne(FolderName);
+      res.status(201).json(ileData);
     } else {
       const fileUuid = uuidv4();
       const fileExtension = type === 'image' ? 'png' : 'txt';
       const filePath = path.join(FOLDER_PATH, `${fileUuid}.${fileExtension}`);
+      // fileData = touch filePath
 
       const decodedData = Buffer.from(data, 'base64');
       fs.writeFileSync(filePath, decodedData);
@@ -82,5 +85,3 @@ const FileController = {
 }
 
 export default FileController;
-
-
