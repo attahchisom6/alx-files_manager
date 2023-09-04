@@ -33,7 +33,7 @@ const FileController = {
     }
 
     if (parentId) {
-      const parentFile = await dbClient.FilesCollection.findOne({
+      const parentFile = await dbClient.filesCollection.findOne({
         _id: dbClient.getObjectID(parentId),
         type: 'folder';
       });
@@ -57,9 +57,30 @@ const FileController = {
     }
 
     const fileData = {
-      userId: userid,
+      userId: userId
       name: name,
-      type: 'folder',
+      type,
       parentId: parentId || '0',
-      isPublic: isPublic || false;
+      isPublic: isPublic || false.
+      localPAth,
     }
+
+    if (type === 'folder') {
+      dbClient.fileCollection().insertOne(fileData);
+      res.status(201).json(fileData);
+    } else {
+      const fileUuid = uuidv4();
+      const fileExtension = type === 'image' ? 'png' : 'txt';
+      const filePath = path.join(FOLDER_PATH, `${fileUuid}.${fileExtension}`);
+
+      const decodedData = Buffer.from(data, 'base64');
+      fs.writeFileSync(filePath, decodedData);
+
+      fileData.localpath = filePath;
+    }
+  }
+}
+
+export default FileController;
+
+
