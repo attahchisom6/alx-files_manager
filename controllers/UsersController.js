@@ -41,6 +41,26 @@ const UsersController = {
       console.error('error in postNew: ', error);
       res.status(500).json({ error: "Internal Server Error"});
     }
+  },
+
+  async getMe() {
+    const { "X-Token": token } = req.headers;
+    try {
+      const key = `auth_${token}`;
+      const userId = await redisClient.get(key);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const user = dbClient.usersCollection().findOne({ id: userId });
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      return res.status(200).json({ email: user.email, id: user._id });
+    } catch(error) {
+      res.status(500).json({ error: "Internal Server Error!" });
+    }
   }
 }
 

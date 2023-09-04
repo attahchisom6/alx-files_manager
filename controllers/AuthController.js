@@ -1,4 +1,4 @@
-import shai from 'shai';
+import shai from 'sha1';
 import { v4 as uuidv4 } from 'uuid';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
@@ -24,18 +24,18 @@ const AuthController = {
       const hashedpassword = sha1(password);
       const user = await dbClient.userCollection.findOne({ email, password: hashedPassWord });
     } catch(error) {
-      res.status(401).json({ error: "Unauthorized" }):
+      res.status(401).json({ error: "Unauthorized" })
       return;
     }
 
     const token = uuidv4();
     const key = `auth_${token}`;
-    await redisClient.set(key, user.id, 86400);
+    await redisClient.set(key, user._id, 86400);
     res.status(200).json({ "token": token });
   },
 
   async getDisconnect(res, req) {
-    const { 'X-Token': token } = req.haeaders;
+    const { 'X-Token': token } = req.headers;
 
     if (!token) {
       res.status(401).json({ error: "Unauthorized" });
@@ -48,4 +48,4 @@ const AuthController = {
   },
 }
 
-export default AuthContoller;
+export default AuthController;
