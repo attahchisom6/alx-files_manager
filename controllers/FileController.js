@@ -21,13 +21,13 @@ const FilesController = {
       return;
     }
 
-    const acceptedTypes = [ 'folder', 'files', 'image' ];
+    const acceptedTypes = [ 'folder', 'file', 'image' ];
     if (!type || !acceptedTypes.includes(type)) {
       res.status(400).json({ error: "Missing name" });
       return;
     }
 
-    if (type != "folder" && !data) {
+    if (type !== "folder" && !data) {
       res.status(400).json({ error: "Missing data" });
       return;
     }
@@ -50,18 +50,23 @@ const FilesController = {
     }
 
     const userKey = `auth_${token}`;
-    const userId = redisClient.get(userKey);
-    if (!userKey) {
-      res.status(400).json({ error: 'Unauthorized' });
-      return;
-    }
+    try {
+      const userId = redisClient.get(userKey);
+      if (!userId) {
+        return res.status(400).json({ error: 'Unauthorized' });
+        return;
+      }
+    } catch(error) {
+      console.error('Could not read from the redis database:', error);
+      return res.status(500).json({ error: 'Internal Server Error'});
+    };
 
     const fileData = {
       userId: userId
       name: name,
       type: type,
       parentId: parentId || '0',
-      isPublic: isPublic || false.
+      isPublic: isPublic || false,
       localPAth: '',
     }
 
@@ -74,12 +79,12 @@ const FilesController = {
         fileData.localPath = folderPath;
       } catch(error) {
         console.log('Could not create a folder:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        return res.status(500).json({ error: 'Internal Server Error' });
       }
 
       await dbClient.fileCollection().insertOne(fileData);
       res.status(201).json(fileData);
-    } else {
+    } else if (type === 'image' || type === 'file') {
       const fileUuid = uuidv4();
       const fileExtension = type === 'image' ? 'png' || 'jpg' : 'txt';
       const filePath = path.join(FOLDER_PATH, `${fileUuid}.${fileExtension}`);
@@ -90,10 +95,10 @@ const FilesController = {
         fs.writeFileSync(filePath, decodedData);
       } catch (error) {
         console.log('Could Not Write to File:', error);
-        res.status(500).json({ error: "Internal Server Error" });
+        return res.status(500).json({ error: "Internal Server Error" });
       }
 
-      fileData.localpath = filePath;
+      fileData.localpath = localPath;
       await dbClient.filesCollection().insertOne(fileData);
       res.status(201).json(fileData);
     }
