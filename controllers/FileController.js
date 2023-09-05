@@ -6,6 +6,26 @@ import { v4 as uuidv4 } from 'uuid';
 
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
+async getUserId(res, req) {
+  const { 'X-Token': token } = req.headers;
+  if (!token) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    const userId = await redisClient.get(userKey);
+    if (!userId) {
+      return res.status(401).json({ erro
+r: "Unauthorized" });
+    }
+    return userId;
+  } catch (error) {
+    console.error('Redis Server error:', error);
+    res.status(500).json({ error: "internal Server Error" });
+  }
+}
+
 const FilesController = {
   async postUpload(req, res) {
     const { 'X-Token': token } = req.headers;
@@ -101,6 +121,54 @@ const FilesController = {
       await dbClient.filesCollection().insertOne(fileData);
       res.status(201).json(fileData);
     }
+  },
+
+  async getShow(req, res) {
+    const fileId = req.params.id;
+    const { 'X-Token': token } = req.headers;
+
+    if (!token) {
+      res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const userKey = `auth_${token}`;
+    try {
+      const userId = await redisClient.get(userKey);
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+      }
+    } catch(error) {
+      console.error('Error with the redis server', error);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+
+    const requiredFile = dbClient.filesCollection.findOne({
+      _id: fileId,
+      userId: userId,
+    });
+
+    if (!requiredFile) {
+      res.status(404).json({ error: "Not found" });
+    }
+    res.status(200).json(requiredFile);
+  },
+
+  async getIndex(pageNumber) {
+    const { parentId, page } = req.body;
+
+    const userid = await getUserId(req, res);
+    if (parentId === 0) {
+      return [];
+    }
+    
+    const pageNum = dbClient.filesCollection().aggregate((page) => {
+      page = (page - 1) * 20;
+    });
+
+    dbClient.filesCollection().findAll({
+      parentId: parentId,
+      page: page,
+    });
   }
 }
 
