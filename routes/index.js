@@ -21,4 +21,10 @@ router.get('/users/me', UsersController.getMe);
 // Hamdle File operations
 router.post('/files', FilesController.postUpload);
 
+router.get('/files/:id', FilesController.getShow);
+router.get('/files', FileController.getIndex);
+
+router.put('/files/:id/putPublish', FilesController.putPublish);
+router.put('/files/:id/unpublish', FilesController.putUnpublish);
+
 export default router;

@@ -25,16 +25,14 @@ async getUserId(req) {
   }
 }
 
-async redisError(req, res) {
+async redisError(req, res, userId) {
   try {
-    const userId = getUserId(req);
     if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
+      return res.status(401).json({ error: "Unauthorized" });
     }
   } catch(error) {
     console.error('Redis server, encountered a problem', error);
-    res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 }
 
@@ -76,15 +74,8 @@ const FilesController = {
       }
     }
 
-    try {
-      const userId = await getUserId(req);
-      if (!userId) {
-        return res.status(400).json({ error: 'Unauthorized' });
-      }
-    } catch(error) {
-      console.error('Could not read from the redis database:', error);
-      return res.status(500).json({ error: 'Internal Server Error'});
-    };
+    const userId = await getUserId(req);
+    await redisError(req, res, userId);
 
     const fileData = {
       userId: userId,
@@ -133,15 +124,8 @@ const FilesController = {
     const fileId = req.params.id;
     const { 'X-Token': token } = req.headers;
 
-    try {
-      const userId = await getUserId(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Unauthorized' });
-      }
-    } catch(error) {
-      console.error('Error with the redis server', error);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
+    const userId = getUserId(req);
+    await redisError(req, res, userId);
 
     const requiredFile = dbClient.filesCollection().findOne({
       _id: dbClient.getObjectID(fileId),
@@ -154,18 +138,11 @@ const FilesController = {
     res.status(200).json(requiredFile);
   },
 
-  async getIndex(pageNumber) {
+  async getIndex(req, res) {
     const { parentId, page } = req.query;
 
-    try {
-      const userId = await getUserId(req);
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-    } catch(error) {
-      console.error('Could not read from redis database;', error);
-      return res.status(500).json({ error: 'Internal Server Error' });
-    }
+    const userId = getUserId(req);
+    await redisError(req, res, userId);
 
     if (parentId === 0) {
       return [];
@@ -183,26 +160,18 @@ const FilesController = {
     res.status(200).json(files);
   },
 
-  async putPublish(res, req) {
+  async putPublish(req, res) {
     const fileId = req.params.id;
 
-    try {
-      const userId = await getUserId(req);
-
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-    } catch(error) {
-      console.error('Redis server encountered an an error:', error);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
+    const userId = await getUserId(req);
+    await redisError(req, res, userId);
 
     const requiredFile = dbClient.filesCollection().findOne({
       _id: dbClient.getObjectID(fileId),
       userId: userId,
     });
 
-    if ( requuredFile) {
+    if ( requiredFile) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -215,7 +184,7 @@ const FilesController = {
     const fileId = req.params.id;
 
     const userId = await getUserId(req);
-    await redisError(req, res);
+    await redisError(req, res, userId);
 
     const requiredFile = await dbClient.filesCollection().findOne({
       _id: dbClient.getObjectID(fileId),
