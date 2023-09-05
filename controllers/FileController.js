@@ -23,7 +23,7 @@ const FilesController = {
 
     const acceptedTypes = [ 'folder', 'file', 'image' ];
     if (!type || !acceptedTypes.includes(type)) {
-      res.status(400).json({ error: "Missing name" });
+      res.status(400).json({ error: "Missing type" });
       return;
     }
 
@@ -35,7 +35,7 @@ const FilesController = {
     if (parentId) {
       const parentFile = await dbClient.filesCollection.findOne({
         _id: dbClient.getObjectID(parentId),
-        type: 'folder';
+        type: 'folder',
       });
 
       if (!parentFile) {
@@ -51,10 +51,9 @@ const FilesController = {
 
     const userKey = `auth_${token}`;
     try {
-      const userId = redisClient.get(userKey);
+      const userId = await redisClient.get(userKey);
       if (!userId) {
         return res.status(400).json({ error: 'Unauthorized' });
-        return;
       }
     } catch(error) {
       console.error('Could not read from the redis database:', error);
@@ -62,12 +61,12 @@ const FilesController = {
     };
 
     const fileData = {
-      userId: userId
+      userId: userId,
       name: name,
       type: type,
       parentId: parentId || '0',
       isPublic: isPublic || false,
-      localPAth: '',
+      localPath: '',
     }
 
     if (type === 'folder') {
@@ -98,7 +97,7 @@ const FilesController = {
         return res.status(500).json({ error: "Internal Server Error" });
       }
 
-      fileData.localpath = localPath;
+      fileData.localpath = filePath;
       await dbClient.filesCollection().insertOne(fileData);
       res.status(201).json(fileData);
     }
