@@ -6,23 +6,35 @@ import { v4 as uuidv4 } from 'uuid';
 
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
-async getUserId(res, req) {
+async getUserId(req) {
   const { 'X-Token': token } = req.headers;
   if (!token) {
-    res.status(401).json({ error: "Unauthorized" });
     return;
   }
+  const userKey = `auth_${token}`;
 
   try {
     const userId = await redisClient.get(userKey);
     if (!userId) {
-      return res.status(401).json({ erro
-r: "Unauthorized" });
+      return;
     }
     return userId;
   } catch (error) {
     console.error('Redis Server error:', error);
-    res.status(500).json({ error: "internal Server Error" });
+    return;
+  }
+}
+
+async redisError(req, res) {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+  } catch(error) {
+    console.error('Redis server, encountered a problem', error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 }
 
@@ -30,11 +42,6 @@ const FilesController = {
   async postUpload(req, res) {
     const { 'X-Token': token } = req.headers;
     const { name, type, parentId, isPublic, data } = req.body;
-
-    if (!token) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
 
     if (!name) {
       res.status(400).json({ error: "Missing name" });
@@ -69,9 +76,8 @@ const FilesController = {
       }
     }
 
-    const userKey = `auth_${token}`;
     try {
-      const userId = await redisClient.get(userKey);
+      const userId = await getUserId(req);
       if (!userId) {
         return res.status(400).json({ error: 'Unauthorized' });
       }
@@ -127,13 +133,8 @@ const FilesController = {
     const fileId = req.params.id;
     const { 'X-Token': token } = req.headers;
 
-    if (!token) {
-      res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const userKey = `auth_${token}`;
     try {
-      const userId = await redisClient.get(userKey);
+      const userId = await getUserId(req);
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
       }
@@ -142,8 +143,8 @@ const FilesController = {
       return res.status(500).json({ error: "Internal Server Error" });
     }
 
-    const requiredFile = dbClient.filesCollection.findOne({
-      _id: fileId,
+    const requiredFile = dbClient.filesCollection().findOne({
+      _id: dbClient.getObjectID(fileId),
       userId: userId,
     });
 
@@ -154,22 +155,80 @@ const FilesController = {
   },
 
   async getIndex(pageNumber) {
-    const { parentId, page } = req.body;
+    const { parentId, page } = req.query;
 
-    const userid = await getUserId(req, res);
+    try {
+      const userId = await getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+    } catch(error) {
+      console.error('Could not read from redis database;', error);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+
     if (parentId === 0) {
       return [];
     }
     
-    const pageNum = dbClient.filesCollection().aggregate((page) => {
-      page = (page - 1) * 20;
+    const pageNum = parseInt(page || '0', 10);
+    const skip = pageNum * 20;
+
+    const files = dbClient.filesCollection().aggregate([
+      { $match: { userId: userId, parentId: parentId } },
+      { $skip: skip },
+      { $limit: 20 },
+    ]).toArray();
+
+    res.status(200).json(files);
+  },
+
+  async putPublish(res, req) {
+    const fileId = req.params.id;
+
+    try {
+      const userId = await getUserId(req);
+
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+    } catch(error) {
+      console.error('Redis server encountered an an error:', error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+
+    const requiredFile = dbClient.filesCollection().findOne({
+      _id: dbClient.getObjectID(fileId),
+      userId: userId,
     });
 
-    dbClient.filesCollection().findAll({
-      parentId: parentId,
-      page: page,
+    if ( requuredFile) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    requiredFile.isPublic = true;
+    res.status(200).json(requiredFile);
+  },
+
+  async putUnpublish(req, res) {
+    const fileId = req.params.id;
+
+    const userId = await getUserId(req);
+    await redisError(req, res);
+
+    const requiredFile = await dbClient.filesCollection().findOne({
+      _id: dbClient.getObjectID(fileId),
+      userId: userId,
     });
-  }
+
+    if (!requiredFile) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    requiredFile.isPublic = false;
+    res.status(200).json(requiredFile);
+  },
 }
 
 export default FilesController;
