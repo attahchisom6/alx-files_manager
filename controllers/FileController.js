@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
-const FileController = {
+const FilesController = {
   async postUpload(req, res) {
     const { 'X-Token': token } = req.headers;
     const { name, type, parentId, isPublic, data } = req.body;
@@ -59,29 +59,45 @@ const FileController = {
     const fileData = {
       userId: userId
       name: name,
-      type,
+      type: type,
       parentId: parentId || '0',
       isPublic: isPublic || false.
-      localPAth,
+      localPAth: '',
     }
 
     if (type === 'folder') {
-      const fileData.name = name;
-      // something like mkdir fileData should be here, write in js
-      dbClient.fileCollection().insertOne(FolderName);
-      res.status(201).json(ileData);
+      const folderName = name;
+      const folderPath = path.join(FOLDER_PATH, folderName);
+
+      try {
+        fs.mkdirSync(folderPath);
+        fileData.localPath = folderPath;
+      } catch(error) {
+        console.log('Could not create a folder:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+
+      await dbClient.fileCollection().insertOne(fileData);
+      res.status(201).json(fileData);
     } else {
       const fileUuid = uuidv4();
-      const fileExtension = type === 'image' ? 'png' : 'txt';
+      const fileExtension = type === 'image' ? 'png' || 'jpg' : 'txt';
       const filePath = path.join(FOLDER_PATH, `${fileUuid}.${fileExtension}`);
-      // fileData = touch filePath
 
       const decodedData = Buffer.from(data, 'base64');
-      fs.writeFileSync(filePath, decodedData);
+
+      try {
+        fs.writeFileSync(filePath, decodedData);
+      } catch (error) {
+        console.log('Could Not Write to File:', error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
 
       fileData.localpath = filePath;
+      await dbClient.filesCollection().insertOne(fileData);
+      res.status(201).json(fileData);
     }
   }
 }
 
-export default FileController;
+export default FilesController;
