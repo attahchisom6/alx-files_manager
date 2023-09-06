@@ -43,7 +43,7 @@ const UsersController = {
     }
   },
 
-  async getMe() {
+  async getMe(req, res) {
     const { "X-Token": token } = req.headers;
     try {
       const key = `auth_${token}`;

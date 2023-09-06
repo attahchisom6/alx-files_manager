@@ -3,6 +3,7 @@ import redisClient from '../utils';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { MIME-type } from 'mime-types';
 
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
@@ -58,7 +59,7 @@ const FilesController = {
     }
 
     if (parentId) {
-      const parentFile = await dbClient.filesCollection.findOne({
+      const parentFile = await(await dbClient.filesCollection()).findOne({
         _id: dbClient.getObjectID(parentId),
         type: 'folder',
       });
@@ -98,7 +99,7 @@ const FilesController = {
         return res.status(500).json({ error: 'Internal Server Error' });
       }
 
-      await dbClient.fileCollection().insertOne(fileData);
+      await(await dbClient.fileCollection()).insertOne(fileData);
       res.status(201).json(fileData);
     } else if (type === 'image' || type === 'file') {
       const fileUuid = uuidv4();
@@ -115,7 +116,7 @@ const FilesController = {
       }
 
       fileData.localpath = filePath;
-      await dbClient.filesCollection().insertOne(fileData);
+      await (await dbClient.filesCollection()).insertOne(fileData);
       res.status(201).json(fileData);
     }
   },
@@ -127,7 +128,7 @@ const FilesController = {
     const userId = getUserId(req);
     await redisError(req, res, userId);
 
-    const requiredFile = dbClient.filesCollection().findOne({
+    const requiredFile = await (await dbClient.filesCollection()).findOne({
       _id: dbClient.getObjectID(fileId),
       userId: userId,
     });
@@ -151,7 +152,7 @@ const FilesController = {
     const pageNum = parseInt(page || '0', 10);
     const skip = pageNum * 20;
 
-    const files = dbClient.filesCollection().aggregate([
+    const files = await(await dbClient.filesCollection()).aggregate([
       { $match: { userId: userId, parentId: parentId } },
       { $skip: skip },
       { $limit: 20 },
@@ -166,7 +167,7 @@ const FilesController = {
     const userId = await getUserId(req);
     await redisError(req, res, userId);
 
-    const requiredFile = dbClient.filesCollection().findOne({
+    const requiredFile = await( await dbClient.filesCollection()).findOne({
       _id: dbClient.getObjectID(fileId),
       userId: userId,
     });
@@ -186,7 +187,7 @@ const FilesController = {
     const userId = await getUserId(req);
     await redisError(req, res, userId);
 
-    const requiredFile = await dbClient.filesCollection().findOne({
+    const requiredFile = await(await dbClient.filesCollection()).findOne({
       _id: dbClient.getObjectID(fileId),
       userId: userId,
     });
@@ -197,6 +198,36 @@ const FilesController = {
     }
     requiredFile.isPublic = false;
     res.status(200).json(requiredFile);
+  },
+
+  async getData(req, res) {
+    const fileId = req.params.id;
+
+    try {
+      const requiredFile = await(await dbClient.filesCollection()).findOne({ _id: dbClient.getObjectID(fileId) });
+
+      if (!requiredFile) {
+        return res.status(404).json({ error: "Not found" });
+        return;
+      }
+
+      if (requiredFile.isPublic === false && requiredFile.userId === undefined) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      if (requiredFile.type === 'folder') {
+        return res.status(400).json({ error: "A folder doesn't have content" })
+      }
+
+      const fileType = MIME-type(requiredFile.name);
+      if (fileType === 'file') {
+        const filedata = await fs.readFileSync(requiredFile, 'utf-8');
+        res.status(200) json(fileData);
+      }
+    } catch(error) {
+      console.log('An u expected Error occurred in the mongo Server', error);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
   },
 }
 
