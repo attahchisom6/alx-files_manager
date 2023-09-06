@@ -1,4 +1,5 @@
 import dbClient from '../utils/db';
+import redisClient from '../utils/redis';
 import sha1 from 'sha1';
 
 const UsersController = {
@@ -52,13 +53,14 @@ const UsersController = {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const user = await( await dbClient.usersCollection()).findOne({ id: userId });
+      const user = await (await dbClient.usersCollection()).findOne({ id: userId });
       if (!user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
       return res.status(200).json({ email: user.email, id: user._id });
     } catch(error) {
+      console.error('Redis sever encountered an unexpected Error:', error);
       res.status(500).json({ error: "Internal Server Error!" });
     }
   }

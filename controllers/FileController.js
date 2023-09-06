@@ -1,13 +1,13 @@
 import dbClient from '../utils/db';
-import redisClient from '../utils';
+import redisClient from '../utils/redis';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { MIME-type } from 'mime-types';
+import mime from 'mime-types';
 
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
-async getUserId(req) {
+async function getUserId(req) {
   const { 'X-Token': token } = req.headers;
   if (!token) {
     return;
@@ -26,7 +26,7 @@ async getUserId(req) {
   }
 }
 
-async redisError(req, res, userId) {
+async function redisError(req, res, userId) {
   try {
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -93,7 +93,6 @@ const FilesController = {
 
       try {
         fs.mkdirSync(folderPath);
-        fileData.localPath = folderPath;
       } catch(error) {
         console.log('Could not create a folder:', error);
         return res.status(500).json({ error: 'Internal Server Error' });
@@ -211,7 +210,8 @@ const FilesController = {
         return;
       }
 
-      if (requiredFile.isPublic === false && requiredFile.userId === undefined) {
+      const userId = await getUserId(req);
+      if (!requiredFile.isPublic && (!userId || requiredFile.userId !== userId)) {
         return res.status(404).json({ error: "Not found" });
       }
 
@@ -219,10 +219,14 @@ const FilesController = {
         return res.status(400).json({ error: "A folder doesn't have content" })
       }
 
-      const fileType = MIME-type(requiredFile.name);
-      if (fileType === 'file') {
-        const filedata = await fs.readFileSync(requiredFile, 'utf-8');
-        res.status(200) json(fileData);
+      const filePath = requiredFile.localPath;
+      if (!fs.existsFileSync(filePath)) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      if (mime.lookup(filePath) === 'file') {
+        const fileData = fs.readFileSync(requiredFile, 'utf-8');
+        res.status(200).json({ data: fileData });
       }
     } catch(error) {
       console.log('An u expected Error occurred in the mongo Server', error);
