@@ -22,14 +22,14 @@ const AuthController = {
 
     try {
       const hashedPassword = sha1(password);
-      const user = await dbClient.userCollection.findOne({ email, password: hashedPassword });
+      const user = await (await dbClient.usersCollection()).findOne({ email, password: hashedPassword });
       if (!user) {
         res.status(401).json({ error: "Unauthorized" });
       }
 
       const token = uuidv4();
       const key = `auth_${token}`;
-      await redisClient.set(key, user._id.findOne(), 86400);
+      await redisClient.set(key, user._id.toString(), 86400);
       res.status(200).json({ "token": token });
     } catch(error) {
       res.status(500).json({ error: "Internal Server Error" });
