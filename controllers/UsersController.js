@@ -52,7 +52,7 @@ const UsersController = {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const user = dbClient.usersCollection().findOne({ id: userId });
+      const user = await( await dbClient.usersCollection()).findOne({ id: userId });
       if (!user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
