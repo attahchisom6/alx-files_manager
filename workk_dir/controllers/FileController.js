@@ -7,7 +7,7 @@ import mime from 'mime-types';
 import { ObjectID as objID } from 'mongodb';
 import Queue from 'bull';
 
-const fileQueue = Queue('fileQueue');
+const fileQueue = new Queue('fileQueue');
 
 const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
 
@@ -64,7 +64,7 @@ const FilesController = {
 
     if (parentId) {
       const parentFile = await(await dbClient.filesCollection()).findOne({
-        _id: ObjectID(parentId),
+        _id: objID(parentId),
       });
 
       if (!parentFile) {
@@ -85,7 +85,7 @@ const FilesController = {
       userId: userId,
       name: name,
       type: type,
-      parentId: parentId || '0',
+      parentId: objID(parentId) || 0,
       isPublic: isPublic || false,
     }
 
@@ -99,14 +99,16 @@ const FilesController = {
           console.log(`${folderPath} Already exists. removing...`)
           fs.rmdirSync(folderPath, { recursive: true });
         }
-        fs.mkdirSync(folderPath);
+        fs.mkdirSync(folderPath, { recursive: true });
         console.log('folder created:', folderPath);
       } catch(error) {
         console.log('Could not create a folder:', error);
         return res.status(500).json({ error: 'Internal Server Error' });
       }
 
-      await(await dbClient.filesCollection()).insertOne(fileData);
+      const storedInDB = await(await dbClient.filesCollection()).insertOne(fileData);
+      fileData.id = storedInDB.insertedId;
+      delete fileData._id;
       res.status(201).json(fileData);
     } else if (type === 'image' || type === 'file') {
       const fileUuid = uuidv4();
@@ -129,9 +131,12 @@ const FilesController = {
       }
 
 
-      await (await dbClient.filesCollection()).insertOne(fileData);
-      res.status(201).json(fileData);
       fileData.localPath = filePath;
+      // fileData.parentId = objID(parentId);
+      const storedInDB = await (await dbClient.filesCollection()).insertOne(fileData);
+      fileData.id = storedInDB.insertedId;
+      delete fileData._id;
+      res.status(201).json(fileData);
     }
   },
 
