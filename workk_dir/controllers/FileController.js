@@ -167,12 +167,18 @@ const FilesController = {
       const filesCollection = await dbClient.filesCollection();
       const pipeline = [];
 
-      pipeline.push({
-        $match: {
-          userId,
-          parentId: parentId ? objID(parentId) : 0,
-        }
-      });
+      if (!parentId) {
+        pipeline.push({
+          $match: { userId, },
+        });
+      } else {
+        pipeline.push({
+          $match: {
+            userId,
+            parentId: parentId ? objID(parentId) : 0,
+          }
+        });
+      }
     
       const pageNum = parseInt(page || '1', 10);
       const itemsPerPage = 20;
