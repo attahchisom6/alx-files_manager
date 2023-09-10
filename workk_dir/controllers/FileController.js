@@ -141,20 +141,29 @@ const FilesController = {
 
   async getShow(req, res) {
     const fileId = req.params.id;
-    const { 'X-Token': token } = req.headers;
 
     const userId = getUserId(req);
+    console.log(userId);
     await redisError(req, res, userId);
 
-    const requiredFile = await (await dbClient.filesCollection()).findOne({
-      _id: dbClient.getObjectID(fileId),
-      userId: userId,
-    });
+    try{
+      const requiredFile = await (await dbClient.filesCollection()).findOne({
+        _id: objID(fileId),
+        userId: userId,
+      });
+      console.log(requiredFile);
 
-    if (!requiredFile) {
-      res.status(404).json({ error: "Not found" });
+      if (!requiredFile) {
+        res.status(404).json({ error: "Not found" });
+      }
+
+      requiredFile.id = requiredFile._id;
+      delete requiredFile._id;
+      res.status(200).json(requiredFile);
+    } catch(error) {
+      console.error('cannot get the rrequired file from database', error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
-    res.status(200).json(requiredFile);
   },
 
   async getIndex(req, res) {
@@ -191,7 +200,17 @@ const FilesController = {
 
       const files = await filesCollection.aggregate(pipeline).toArray();
       console.log(files);
-      res.status(200).json(files);
+
+      const filesInFormat = files.map((file) => {
+        const fileData = {
+          ...file,
+          id: file._id,
+        };
+        delete fileData._id;
+
+        return fileData;
+      });
+      res.status(200).send(JSON.stringify(filesInFormat, null, 2));
     } catch(error) {
       console.log('could fetch files from the database', error);
       res.status(500).json({ error: "Internal Server Error" });
