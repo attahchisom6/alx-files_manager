@@ -85,22 +85,21 @@ const FilesController = {
       userId: userId,
       name: name,
       type: type,
-      parentId: objID(parentId) || 0,
+      parentId: parentId || 0,
       isPublic: isPublic || false,
     }
 
     if (type === 'folder') {
-      const folderName = name;
-      const folderPath = path.join(FOLDER_PATH, folderName);
-      console.log('folderName', folderPath);
+      // const folderName = name;
+      // const folderPath = path.join(FOLDER_PATH, folderName);
+      console.log('folderName:', FOLDER_PATH);
 
       try {
-        if (fs.existsSync(folderPath)) {
-          console.log(`${folderPath} Already exists. removing...`)
-          fs.rmdirSync(folderPath, { recursive: true });
+        if (!fs.existsSync(FOLDER_PATH)) {
+          console.log(`${folderPath} does not  exists. creating...`);
+          fs.mkdirSync(FOLDER_PATH);
+          console.log('folder created');
         }
-        fs.mkdirSync(folderPath, { recursive: true });
-        console.log('folder created:', folderPath);
       } catch(error) {
         console.log('Could not create a folder:', error);
         return res.status(500).json({ error: 'Internal Server Error' });
@@ -113,11 +112,12 @@ const FilesController = {
     } else if (type === 'image' || type === 'file') {
       const fileUuid = uuidv4();
 
-      if (FOLDER_PATH) {
-        console.log(`${FOLDER_PATH} already exists. removing...`);
-        fs.rmdirSync(FOLDER_PATH, { recursive: true });
+      if (!fs.existsSync(FOLDER_PATH)) {
+        console.log(`${FOLDER_PATH} does not exists. creating...`);
+        fs.mkdirSync(FOLDER_PATH, { recursive: true });
+        console.log(`${FOLDER_PATH} created`);
       }
-      fs.mkdirSync(FOLDER_PATH);
+
       const filePath = path.join(FOLDER_PATH, fileUuid);
 
       const decodedData = Buffer.from(data, 'base64').toString('ascii');
@@ -130,13 +130,12 @@ const FilesController = {
         return res.status(500).json({ error: "Internal Server Error" });
       }
 
-
+      res.status(201).json(fileData);
+      fileData.parentId = objID(parentId);
       fileData.localPath = filePath;
-      // fileData.parentId = objID(parentId);
       const storedInDB = await (await dbClient.filesCollection()).insertOne(fileData);
       fileData.id = storedInDB.insertedId;
       delete fileData._id;
-      res.status(201).json(fileData);
     }
   },
 
@@ -161,23 +160,36 @@ const FilesController = {
   async getIndex(req, res) {
     const { parentId, page } = req.query;
 
-    const userId = getUserId(req);
+    const userId = await getUserId(req); 
     await redisError(req, res, userId);
 
-    if (parentId === 0) {
-      return [];
-    }
+    try{
+      const filesCollection = await dbClient.filesCollection();
+      const pipeline = [];
+
+      pipeline.push({
+        $match: {
+          userId,
+          parentId: parentId ? objID(parentId) : 0,
+        }
+      });
     
-    const pageNum = parseInt(page || '0', 10);
-    const skip = pageNum * 20;
+      const pageNum = parseInt(page || '1', 10);
+      const itemsPerPage = 20;
+      const skip = (pageNum - 1) * itemsPerPage;
 
-    const files = await(await dbClient.filesCollection()).aggregate([
-      { $match: { userId: userId, parentId: parentId } },
-      { $skip: skip },
-      { $limit: 20 },
-    ]).toArray();
+      pipeline.push(
+        { $skip: skip },
+        { $limit: itemsPerPage }
+      );
 
-    res.status(200).json(files);
+      const files = await filesCollection.aggregate(pipeline).toArray();
+      console.log(files);
+      res.status(200).json(files);
+    } catch(error) {
+      console.log('could fetch files from the database', error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   },
 
   async putPublish(req, res) {
